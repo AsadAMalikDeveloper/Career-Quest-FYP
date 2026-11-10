@@ -40,22 +40,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _isSameUser = false;
   List<int>? pdfBytes;
 
-  FilePickerResult _pdfFileResult = const FilePickerResult([]);
+  /// The PDF currently selected by the user, or `null` when none is chosen.
+  PlatformFile? _selectedPdf;
 
   Future<void> _pickPDFFile() async {
     try {
-      FilePickerResult? result = await FilePicker.platform.pickFiles(
+      final PlatformFile? file = await FilePicker.pickFile(
         type: FileType.custom,
-        allowedExtensions: ['pdf'],
-        allowMultiple: false,
+        allowedExtensions: const ['pdf'],
       );
 
-      if (result != null) {
+      // A null result means the user dismissed the picker.
+      if (file != null && mounted) {
         setState(() {
-          _pdfFileResult = result;
+          _selectedPdf = file;
         });
       }
     } catch (e) {
+      if (!mounted) return;
       GlobalMethod.showErrorDialog(
           error: "Error picking PDF file: $e", ctx: context);
     }
@@ -348,7 +350,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                                                       Expanded(
                                                                         child: Container(
                                                                             decoration: decoration1,
-                                                                            child: _pdfFileResult.files.isEmpty
+                                                                            child: _selectedPdf == null
                                                                                 ? boxContent(context, "Select PDF File", "1", "assets/images/cnic_icon.png")
                                                                                 : Stack(
                                                                                     children: [
@@ -356,7 +358,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                                                                           height: 50,
                                                                                           child: Center(
                                                                                               child: Text(
-                                                                                            _pdfFileResult.files.single.name,
+                                                                                            _selectedPdf!.name,
                                                                                             textAlign: TextAlign.center,
                                                                                           ))),
                                                                                       // Image.file(
@@ -373,7 +375,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                                                                             // Handle delete action
 
                                                                                             setState(() {
-                                                                                              _pdfFileResult = const FilePickerResult([]);
+                                                                                              _selectedPdf = null;
                                                                                               _isPDFReadable = true;
                                                                                             });
                                                                                           },
@@ -399,9 +401,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                                                       ),
                                                                     ],
                                                                   ),
-                                                                  _pdfFileResult
-                                                                          .files
-                                                                          .isEmpty
+                                                                  _selectedPdf == null
                                                                       ? SizedBox()
                                                                       : _isPDFReadable
                                                                           ? Padding(
@@ -419,7 +419,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                                                                   SizedBox(
                                                                                     height: 250,
                                                                                     child: PDFView(
-                                                                                      filePath: _pdfFileResult.files.single.path!,
+                                                                                      filePath: _selectedPdf!.path!,
                                                                                       onPageChanged: (int? page, int? total) {
                                                                                         setState(() {
                                                                                           _pages = total!;
@@ -682,7 +682,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   bool isUploading = false;
   uploadFile(BuildContext context) async {
-    if (_pdfFileResult.files.isEmpty) {
+    if (_selectedPdf == null) {
       GlobalMethod.showErrorDialog(error: "Please Select PDF", ctx: context);
     } else if (_isPDFReadable != true) {
       GlobalMethod.showErrorDialog(
@@ -691,11 +691,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
       setState(() {
         isUploading = true;
       });
-      File file = File(_pdfFileResult.files.single.path!);
+      File file = File(_selectedPdf!.path!);
       if (file.existsSync()) {
         //Uint8List image = await file.readAsBytes();
         //String pdfBase64 = base64Encode(image);
-        ApiManager.uploadCV(_pdfFileResult.files.single.path!).then((user) {
+        ApiManager.uploadCV(_selectedPdf!.path!).then((user) {
           msg = user;
           if (msg.toLowerCase().contains('file uploaded successfully!')) {
             setState(() {
